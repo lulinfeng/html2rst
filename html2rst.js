@@ -1,6 +1,6 @@
 
 define('html2rst', function () {
-Parser = function () {
+var Parser = function () {
   this.result = '';
   this.currentTags = [];
   this.lasttag = '';
@@ -10,9 +10,6 @@ Parser = function () {
   this.openTag_re = new RegExp('<([a-zA-Z][^\t\n\r\f />\x00]*)(?:[\s/]*.*?>)', 'g')
   this.rowTag = new Set(['td','th'])
   this.codeTag = new Set(['pre', 'code'])
-  this.codeStatus = false
-  // tdor th's contents in tr
-  this.row_data = []
   this.headerTag = {
     'h1': '=',
     'h2': '-',
@@ -27,22 +24,24 @@ Parser = function () {
     'footer', 'form', 'header', 'hr', 'li', 'main', 'nav', 'noscript', 'ol',
     'output', 'p', 'pre', 'section', 'table', 'tfoot', 'ul', 'video', 'caption']);
   this.nothingTag = new Set(['script', 'style', 'noscript'])
+  this.tagData = {}
 }
 
 Parser.prototype = {
+  setTagData: function (tag, data) {
+    if (tag in this.tagData) {
+      this.tagData[tag].push(data)
+    } else {
+      this.tagData[tag] = [data]
+    }
+  },
   // start and close tag
   tag_dispash: function (tag, start_end) {
     var handle, ctag;
     if (start_end == 'start') {
       this.currentTags.push(tag)
       this.lasttag = tag
-      if (this.codeTag.has(tag)) {
-        this.codeStatus = true
-      }
     } else {
-      if (this.codeTag.has(tag)) {
-        this.codeStatus = false
-      }
       // 关闭标签后,最后的tag要取父级的tag,因此,单体tag如<br><hr>等需要立即关闭
       while (ctag = this.currentTags.pop()) {
         if (this.lasttag == ctag) {
@@ -56,8 +55,11 @@ Parser.prototype = {
           }
         }
       }
+      // h1--h7 tag end handle in once
+      if (this.lasttag in this.headerTag) {
+        this.on_headertag_end()
+      }
     }
-
     handle = 'on_' + tag + '_' + start_end
     if (this[handle]) {
       this[handle](tag)
@@ -124,18 +126,42 @@ Parser.prototype = {
   },
   on_thead_start: function () {
     this.result += '\n    :header: '
-    this.row_data = [];
   },
   on_tr_start: function () {
-    this.result += '\n    '
-    this.row_data = [];
+    if (this.currentTags.indexOf('thead') == -1) {
+      this.result += '\n    '
+    }
+    this.setTagData('tr', [])
   },
   on_tr_end: function () {
-    this.result += this.row_data.join(', ')
+    this.result += this.tagData['tr'].join(', ')
+  },
+  on_code_end: function () {
+    if ('code' in this.tagData && this.tagData['code'].length > 0) {
+      this.result += '\n\n.. code::\n' + this.tagData['code'].join('')
+      this.tagData['code'] = []
+    }
+  },
+  on_pre_end: function () {
+    if ('pre' in this.tagData && this.tagData['pre'].length > 0) {
+      var pre = this.tagData['pre'];
+      if (pre.join('').trim() == '') {
+        return
+      }
+      this.result += '\n\n.. code::\n' + this.tagData['pre'].join('')
+      this.tagData['pre'] = []
+    }
+  },
+  on_headertag_end: function () {
+    // h1--h7
+    var text = this.tagData[this.lasttag].join(' ')
+    this.result += '\n\n' + text + '\n'
+    this.result += this.headerTag[this.lasttag].repeat(text.length) + '\n'
   },
   handle_data: function (data) {
     if (this.codeTag.has(this.lasttag)) {
-      this.result += data
+      // this.result += data
+      this.setTagData(this.lasttag, data)
       return
     }
     data = data.trim()
@@ -143,10 +169,11 @@ Parser.prototype = {
       return
     }
     if (this.rowTag.has(this.lasttag)) {
-      this.row_data.push(data)
+      this.setTagData('tr', data)
     } else if (this.lasttag in this.headerTag) {
-      this.result += '\n\n' + data + '\n'
-      this.result += this.headerTag[this.lasttag].repeat(data.length) + '\n'
+      this.setTagData(this.lasttag, data)
+      // this.result += '\n\n' + data + '\n'
+      // this.result += this.headerTag[this.lasttag].repeat(data.length) + '\n'
     } else if (this.blockTag.has(this.lasttag)) {
       this.result += data + '\n'
     } else if (this.nothingTag.has(this.lasttag)) {
