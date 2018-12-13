@@ -85,12 +85,14 @@ Parser.prototype = {
       // h1--h7 tag end handle in once
       if (tag in this.headerTag) {
         this.on_headertag_end(tag, data)
-      } else if (this.codeTag.has(tag)) {
-        this.inCodeBlock = false
       }
     }
     if (this[handle]) {
       this[handle](data)
+    }
+    // set false after all endtag function handled data
+    if (this.codeTag.has(tag)) {
+      this.inCodeBlock = false
     }
   },
   // start and close tag
@@ -184,18 +186,20 @@ Parser.prototype = {
   },
   on_code_end: function (data) {
     if (data && data.length > 0) {
-      if (data.join('').trim() == '') {
-        return
+      if (this.inCodeBlock) {
+        this.write('\n\n.. code::\n\n    ' + data.join('') + '\n')
+      } else {
+        this.write(data.join())
       }
-      this.write('\n\n.. code::\n\n    ' + data.join('') + '\n')
     }
   },
   on_pre_end: function (data) {
     if (data && data.length > 0) {
-      if (data.join('').trim() == '') {
-        return
+      if (this.inCodeBlock) {
+        this.write('\n\n.. code::\n\n    ' + data.join('') + '\n')
+      } else {
+        this.write(data.join(''))
       }
-      this.write('\n\n.. code::\n\n    ' + data.join('') + '\n')
     }
   },
   on_div_end: function (data) {
