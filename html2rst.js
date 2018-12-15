@@ -27,6 +27,17 @@ var Parser = function () {
 }
 
 Parser.prototype = {
+  end_is_newline: function () {
+    if (this.cacheList.length) {
+      var lastCache = this.cacheList[this.cacheList.length -1];
+      if (lastCache.length) {
+        var text = lastCache[lastCache.length - 1];
+        return text.endsWith('\n')
+      }
+    } else {
+      return this.result.endsWith('\n')
+    }
+  },
   byte_length: function (str) {
     // returns the byte length of an utf8 string
     var i, code, l = str.length;
@@ -218,9 +229,13 @@ Parser.prototype = {
   },
   on_headertag_end: function (tag, data) {
     // h1--h7
-    var text = '\n' + data.join('') + '\n'
-    this.write(text)
-    this.write(this.headerTag[tag].repeat(this.byte_length(text) - 2) + '\n')
+    var text = data.join('');
+    if (this.end_is_newline()) {
+      this.write('\n' + text + '\n')
+    } else {
+      this.write('\n\n' + text + '\n')
+    }
+    this.write(this.headerTag[tag].repeat(this.byte_length(text)) + '\n')
   },
   on_p_end: function (data) {
     this.write('\n' + data.join('') + '\n')
