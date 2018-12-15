@@ -21,7 +21,7 @@ var Parser = function () {
   this.nothingTag = new Set(['script', 'style', 'noscript'])
   this.inCodeBlock = false
   this.needCacheTag = new Set(['p', 'tr', 'table', 'thead', 'h1', 'h1', 'h2', 'h3',
-    'h4', 'h5', 'h6', 'h7', 'pre', 'code', 'div'])
+    'h4', 'h5', 'h6', 'h7', 'pre', 'code', 'div', 'tt', 'kbd'])
   // 数据缓存池 用二维数组表示
   this.cacheList = []
 }
@@ -186,10 +186,15 @@ Parser.prototype = {
   },
   on_code_end: function (data) {
     if (data && data.length > 0) {
+      var code = data.join('')
       if (this.inCodeBlock) {
-        this.write('\n\n.. code::\n\n    ' + data.join('') + '\n')
+        if (code.indexOf('\n') != -1) {
+          this.write('\n\n.. code::\n\n    ' + code + '\n')
+        } else {
+          this.write(' ``' + code + '`` ')
+        }
       } else {
-        this.write(data.join())
+        this.write(data.join(''))
       }
     }
   },
@@ -204,7 +209,11 @@ Parser.prototype = {
   },
   on_div_end: function (data) {
     if (data && data.length > 0) {
-      this.write('\n' + data.join(''))
+      if (this.inCodeBlock) {
+        this.write(data.join(''))
+      } else {
+        this.write('\n' + data.join(''))
+      }
     }
   },
   on_headertag_end: function (tag, data) {
@@ -215,6 +224,12 @@ Parser.prototype = {
   },
   on_p_end: function (data) {
     this.write('\n' + data.join('') + '\n')
+  },
+  on_tt_end: function (data) {
+    this.write(' ``' + data.join('') + '`` ')
+  },
+  on_kbd_end: function (data) {
+    this.write(' ``' + data.join('') + '`` ')
   },
   handle_data: function (data) {
     if (this.inCodeBlock) {
