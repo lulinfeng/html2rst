@@ -18,10 +18,10 @@ var Parser = function () {
     'h6': '+',
     'h7': '^',
   };
-  this.nothingTag = new Set(['script', 'style', 'noscript'])
+  this.nothingTag = new Set(['script', 'style', 'noscript', 'meta', 'title', 'link', 'head'])
   this.inCodeBlock = false
   this.needCacheTag = new Set(['p', 'tr', 'table', 'thead', 'h1', 'h1', 'h2', 'h3',
-    'h4', 'h5', 'h6', 'h7', 'pre', 'code', 'div', 'tt', 'kbd'])
+    'h4', 'h5', 'h6', 'h7', 'pre', 'code', 'div', 'tt', 'kbd', 'th', 'td'])
   // 数据缓存池 用二维数组表示
   this.cacheList = []
 }
@@ -230,6 +230,13 @@ Parser.prototype = {
   },
   on_kbd_end: function (data) {
     this.write(' ``' + data.join('') + '`` ')
+  },
+  on_th_end: function (data) {
+    this.write(data.join('').trim().replace(/,/g, '，'))
+  },
+  on_td_end: function (data) {
+    console.log(data)
+    this.write(data.join('').trim().replace(/,/g, '，'))
   },
   handle_data: function (data) {
     if (this.inCodeBlock) {
