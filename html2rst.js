@@ -1,9 +1,9 @@
 
 define('html2rst', function () {
 var Parser = function () {
-  this.result = '';
-  this.currentTags = [];
-  this.lasttag = '';
+  this.result = ''
+  this.currentTags = []
+  this.lasttag = ''
   this.ltCharater_re = new RegExp('<', 'g')
   this.gtCharacter_re = new RegExp('>', 'g')
   this.commentCloseTag_re = new RegExp('--\s*>', 'g')
@@ -22,10 +22,11 @@ var Parser = function () {
   this.inCodeBlock = false
   this.needCacheTag = new Set(['p', 'tr', 'table', 'thead', 'h1', 'h1', 'h2', 'h3',
     'h4', 'h5', 'h6', 'h7', 'pre', 'code', 'div', 'tt', 'kbd', 'th', 'td', 'blockquote',
-    'dd'])
+    'dd', 'ul', 'ol', 'li'])
   // 数据缓存池 用二维数组表示
   this.cacheList = []
   this.startsNewLine_re = new RegExp('^\n*')
+  this.replaceLiIdent_re = new RegExp('([#\-*+]\.? +)', 'g')
 }
 
 Parser.prototype = {
@@ -249,21 +250,20 @@ Parser.prototype = {
   on_headertag_end: function (tag, data) {
     // h1--h7
     var text = data.join('');
-    var n = this.ends_newline_count()
-    if (n < 2) {
-      this.write('\n'.repeat(n - 2) + text + '\n')
+    if (this.ends_newline_count()) {
+      this.write('\n' + text + '\n')
     } else {
-      this.write(text + '\n')
+      this.write('\n\n' + text + '\n')
     }
     this.write(this.headerTag[tag].repeat(this.byte_length(text)) + '\n')
   },
   on_p_end: function (data) {
     var text = data.join('')
-    if (this.inCodeBlock) {
-      this.write(text)
+    if (text.trim() == '') {
       return
     }
-    if (text.trim() == '') {
+    if (this.inCodeBlock) {
+      this.write(data.join(''))
       return
     }
     var n = this.ends_newline_count() + this.starts_newline_count(text)
@@ -299,7 +299,16 @@ Parser.prototype = {
     this.inCodeBlock = false
   },
   on_dd_end: function (data) {
-    this.write('\n    ' + data.join('').split('\n').join('\n    '))
+    this.write('\n    ' + data.join(' ').split('\n').join('\n    '))
+  },
+  on_ul_end: function (data) {
+    this.write('\n\n- ' + data.join('\n- '))
+  },
+  on_ol_end: function (data) {
+    this.write('\n\n#. ' + data.join('\n#. '))
+  },
+  on_li_end: function (data) {
+    this.write(data.join('').replace(this.replaceLiIdent_re, '    $1'))
   },
   handle_data: function (data) {
     if (this.inCodeBlock) {
