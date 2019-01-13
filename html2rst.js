@@ -28,6 +28,22 @@ var Parser = function () {
   this.startsNewLine_re = new RegExp('^\n*')
   this.listItem_re = new RegExp('([#\-*+]\\.? +)', 'g')
   this.trimLineBreak_re = new RegExp('^\n+|\n+$', 'g')
+
+  this.entityref_re = new RegExp('&([a-zA-Z][-.a-zA-Z0-9]*);', 'g')
+  this.charref_re = new RegExp('&#([0-9]+);', 'g')
+  this.entitydefs = {
+    lt: '<',
+    gt: '>',
+    amp: '&',
+    quot: '"',
+    apos: '\'',
+    cent: '¢',
+    pound: '£',
+    yen: '¥',
+    euro: '€',
+    copy: '©',
+    reg: '®'
+  }
 }
 
 Parser.prototype = {
@@ -178,13 +194,13 @@ Parser.prototype = {
         // comment
         this.commentCloseTag_re.lastIndex = i + 3
         m = this.commentCloseTag_re.exec(data)
-        i = m.lastIndex
+        i = this.commentCloseTag_re.lastIndex
       }
       else if (data.startsWith('<!', i)) {
         // doctype
         this.gtCharacter_re.lastIndex = i + 3
         m = this.gtCharacter_re.exec(data)
-        i = m.lastIndex
+        i = this.gtCharacter_re.lastIndex
       }
       else {
         // 如果匹配不到正常的标签，比较奇怪了
@@ -284,10 +300,10 @@ Parser.prototype = {
     var d = data.join('').trim()
     if (d.indexOf(',') != -1) {
       if (d.indexOf('"') != -1) {
-        this.write('"' + d.replace(/"/g, '""'), + '"')
+        this.write('"' + d.replace(/"/g, '""') + '"')
       }
       else{
-        this.write('"' + data + '"')
+        this.write('"' + d + '"')
       }
     }
     else {
@@ -336,7 +352,54 @@ Parser.prototype = {
   on_strong_end: function () {
     this.write('** ')
   },
+
+  handle_entityref_data(data) {
+    var i=0, len=data.length, m, tmp='';
+    this.entityref_re.lastIndex = 0
+    while (i < len) {
+      m = this.entityref_re.exec(data)
+      if (m) {
+        if (m.index > i) {
+          tmp += data.substring(i, m.index)
+        }
+        i = this.entityref_re.lastIndex
+        tmp += this.entitydefs[m[1]] || m[1]
+      } else {
+        tmp += data.substring(i)
+        break
+      }
+    }
+    return tmp
+  },
+  handle_charref_data(data) {
+    var i=0, len=data.length, m, tmp='';
+    this.charref_re.lastIndex = 0
+    while (i < len) {
+      m = this.charref_re.exec(data)
+      if (m) {
+        if (m.index > i) {
+          tmp += data.substring(i, m.index)
+        }
+        i = this.charref_re.lastIndex
+        // convert charref
+        tmp += String.fromCharCode(m[1])
+      } else {
+        tmp += data.substring(i)
+        break
+      }
+    }
+    return tmp
+  },
   handle_data: function (data) {
+    // 处理实体字符
+    if (data.indexOf('&') != -1) {
+      if (data.indexOf('&#') != -1) {
+        data = this.handle_charref_data(data)
+      }
+      if (data.indexOf('&') != -1) {
+        data = this.handle_entityref_data(data)
+      }
+    }
     if (this.inCodeBlock) {
       this.write(data.split('\n').join('\n    '))
     }
